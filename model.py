@@ -1,7 +1,7 @@
 from __future__ import print_function
 from datetime import datetime
-import keras
-from keras.datasets import cifar10
+# import keras
+# from keras.datasets import cifar10
 from fastai.data.external import untar_data, URLs
 from fastai.vision.all import ImageDataLoaders, RandomResizedCrop, Normalize, imagenet_stats, ToTensor, vision_learner, error_rate, Learner
 
