@@ -2,11 +2,12 @@
 # coding: utf-8
 
 
-
-
 from __future__ import print_function
 import keras
 from keras.datasets import cifar10
+from fastai.data.external import untar_data, URLs
+from fastai.vision.all import ImageDataLoaders, RandomResizedCrop, Normalize, imagenet_stats, ToTensor
+
 from keras.preprocessing.image import ImageDataGenerator
 from keras.models import Sequential
 from keras.layers import Dense, Dropout, Activation, Flatten, Reshape, Layer, BatchNormalization, LocallyConnected2D, ZeroPadding2D
@@ -66,7 +67,6 @@ parser.add_argument('--epochs', type=int, default=20,
                     help='Number of epochs to train model')
 
 
-
 args = parser.parse_args()
 
 
@@ -90,7 +90,8 @@ reg = args.reg
 data_augmentation = True
 
 save_dir = os.path.join(os.getcwd(), 'saved_models')
-model_name = 'cifar10_type_'+trial_label+'_noise_start_'+str(noise_start)+'_noise_end_'+str(noise_end)+'_reg_'+str(reg)+'_retina_reg_'+str(retina_out_weight_reg)+'_retina_hidden_channels_'+str(retina_hidden_channels)+'_SS_'+str(retina_out_stride)+'_task_'+task+'_filter_size_'+str(filter_size)+'_retina_layers_'+str(retina_layers)+'_vvs_layers'+str(vvs_layers)+'_bias_'+str(use_b)+'_actreg_'+str(actreg)+'_retina_out_channels_'+str(retina_out_width)+'_vvs_width_'+str(vvs_width)+'_epochs_'+str(epochs)
+model_name = 'cifar10_type_'+trial_label+'_noise_start_'+str(noise_start)+'_noise_end_'+str(noise_end)+'_reg_'+str(reg)+'_retina_reg_'+str(retina_out_weight_reg)+'_retina_hidden_channels_'+str(retina_hidden_channels)+'_SS_'+str(
+    retina_out_stride)+'_task_'+task+'_filter_size_'+str(filter_size)+'_retina_layers_'+str(retina_layers)+'_vvs_layers'+str(vvs_layers)+'_bias_'+str(use_b)+'_actreg_'+str(actreg)+'_retina_out_channels_'+str(retina_out_width)+'_vvs_width_'+str(vvs_width)+'_epochs_'+str(epochs)
 
 batch_size = 64
 num_classes = 10
@@ -104,52 +105,81 @@ if use_b == 1:
 else:
     use_b = False
 
+##################### Imagenette #####################
+path = untar_data(URLs.IMAGENETTE_320)
+
+dls = ImageDataLoaders.from_folder(path, valid='val',
+                                   item_tfms=[ToTensor(), RandomResizedCrop(329)], batch_tfms=Normalize.from_stats(*imagenet_stats))
 
 
+x_train = dls.train_ds
+x_test = dls.valid_ds
 
-    
-(x_train, y_train), (x_test, y_test) = cifar10.load_data()
-x_train = np.mean(x_train, 3, keepdims=True)
-x_test = np.mean(x_test, 3, keepdims=True) 
-print('x_train shape:', x_train.shape)
-print(x_train.shape[0], 'train samples')
-print(x_test.shape[0], 'test samples')
+print('imagenette:\n\nx_train shape:',
+      (len(x_train), len(x_train[0]), x_train[0][0].size))
+#####################
 
-# Convert class vectors to binary class matrices.
-y_train = keras.utils.to_categorical(y_train, num_classes)
-y_test = keras.utils.to_categorical(y_test, num_classes)
+##################### CIFAR-10 #####################
+# (x_train, y_train), (x_test, y_test) = cifar10.load_data()
+# x_train = np.mean(x_train, 3, keepdims=True)
+# x_test = np.mean(x_test, 3, keepdims=True)
+# print('cifar-10:\n\nx_train shape:', x_train.shape)
+# print(x_train.shape[0], 'train samples')
+# print(x_test.shape[0], 'test samples')
 
+# # Convert class vectors to binary class matrices.
+# y_train = keras.utils.to_categorical(y_train, num_classes)
+# y_test = keras.utils.to_categorical(y_test, num_classes)
 
+# print(x_train.shape[1:])
 
+# exit(1)
+#####################
 
 
 filters = 64
-NX = 32
-NY = 32
+NX = 320
+NY = 320
 NC = 1
 img_rows, img_cols, img_chns = NX, NY, NC
 intermediate_dim = 1024
-x = Input(shape=x_train[0].shape)
+# x = Input(shape=x_train[0].shape)
+x = Input(shape=x_train[0][0].size)
 gn = GaussianNoise(noise_start)(x)
 if retina_layers > 2:
-    conv1_nonlin = Conv2D(retina_hidden_channels, (filter_size, filter_size), kernel_regularizer=keras.regularizers.l1(reg),  padding='same', name='retina_1', activation='relu', input_shape=x_train.shape[1:])(gn)
-    retina_out = Conv2D(retina_hidden_channels, (filter_size, filter_size),  kernel_regularizer=keras.regularizers.l1(reg), padding='same',  activation='relu',  name='retina_2', trainable=True)(conv1_nonlin)
+    conv1_nonlin = Conv2D(retina_hidden_channels, (filter_size, filter_size), kernel_regularizer=keras.regularizers.l1(
+        reg),  padding='same', name='retina_1', activation='relu', input_shape=x_train[0][0].size)(gn)
+    retina_out = Conv2D(retina_hidden_channels, (filter_size, filter_size),  kernel_regularizer=keras.regularizers.l1(
+        reg), padding='same',  activation='relu',  name='retina_2', trainable=True)(conv1_nonlin)
     for iterationX in range(retina_layers - 2):
         if iterationX == retina_layers - 3:
-            retina_out = Conv2D(retina_out_width, (filter_size, filter_size), strides=(retina_out_stride,retina_out_stride), kernel_regularizer=keras.regularizers.l1(retina_out_weight_reg), activity_regularizer=keras.regularizers.l1(actreg), padding='same', name='retina_'+str(iterationX+3), activation='relu', use_bias=use_b)(retina_out)
+            retina_out = Conv2D(retina_out_width, (filter_size, filter_size), 
+                            strides=(retina_out_stride, retina_out_stride), kernel_regularizer=keras.regularizers.l1(
+                            retina_out_weight_reg), activity_regularizer=keras.regularizers.l1(actreg), 
+                            padding='same', name='retina_'+str(iterationX+3), 
+                            activation='relu', use_bias=use_b)(retina_out)
         else:
-            retina_out = Conv2D(retina_hidden_channels, (filter_size, filter_size),  kernel_regularizer=keras.regularizers.l1(reg), padding='same', name='retina_'+str(iterationX+3), activation='relu')(retina_out)
-
+            retina_out = Conv2D(retina_hidden_channels, (filter_size, filter_size),  
+                                kernel_regularizer=keras.regularizers.l1(
+                                reg), padding='same', name='retina_'+str(iterationX+3), activation='relu')(retina_out)
 
 
 if retina_layers == 2:
-    conv1_nonlin = Conv2D(retina_hidden_channels, (filter_size, filter_size),  kernel_regularizer=keras.regularizers.l1(reg), padding='same', input_shape=x_train.shape[1:], name='retina_1', activation='relu', trainable=True)(gn)
+    conv1_nonlin = Conv2D(retina_hidden_channels, (filter_size, filter_size),  kernel_regularizer=keras.regularizers.l1(
+        reg), padding='same', input_shape=x_train[0][0].size, name='retina_1', activation='relu', trainable=True)(gn)
 
-    retina_out = Conv2D(retina_out_width, (filter_size, filter_size), strides=(retina_out_stride,retina_out_stride), kernel_regularizer=keras.regularizers.l1(retina_out_weight_reg), padding='same',  activation='relu', activity_regularizer=keras.regularizers.l1(actreg), use_bias=use_b, name='retina_2', trainable=True)(conv1_nonlin)
+    retina_out = Conv2D(retina_out_width, (filter_size, filter_size), strides=(retina_out_stride, retina_out_stride), 
+                        kernel_regularizer=keras.regularizers.l1(
+        retina_out_weight_reg), padding='same',  activation='relu', activity_regularizer=keras.regularizers.l1(actreg), 
+                        use_bias=use_b, name='retina_2', trainable=True)(conv1_nonlin)
 
 
 elif retina_layers == 1:
-    retina_out = Conv2D(retina_out_width, (filter_size, filter_size), strides=(retina_out_stride,retina_out_stride), kernel_regularizer=keras.regularizers.l1(specalreg), activity_regularizer=keras.regularizers.l1(actreg), padding='same', input_shape=x_train.shape[1:], use_bias = use_b, name='retina_1', activation='relu', trainable=True)(gn)
+    retina_out = Conv2D(retina_out_width, (filter_size, filter_size), strides=(retina_out_stride, retina_out_stride), 
+                    kernel_regularizer=keras.regularizers.l1(
+                    specalreg), activity_regularizer=keras.regularizers.l1(actreg), padding='same', 
+                    input_shape=x_train[0][0].size, use_bias=use_b, name='retina_1', activation='relu', 
+                    trainable=True)(gn)
 
 elif retina_layers == 0:
     retina_out = gn
@@ -160,31 +190,38 @@ if noise_end > 0:
 
 
 if vvs_layers > 2:
-    vvs_1 = Conv2D(vvs_width, (filter_size, filter_size), kernel_regularizer=keras.regularizers.l1(reg), padding='same', name='vvs_1', activation='relu')(retina_out)
-    vvs_2 = Conv2D(vvs_width, (filter_size, filter_size), kernel_regularizer=keras.regularizers.l1(reg), padding='same', name='vvs_2', activation='relu')(vvs_1)
+    vvs_1 = Conv2D(vvs_width, (filter_size, filter_size), kernel_regularizer=keras.regularizers.l1(
+        reg), padding='same', name='vvs_1', activation='relu')(retina_out)
+    vvs_2 = Conv2D(vvs_width, (filter_size, filter_size), kernel_regularizer=keras.regularizers.l1(
+        reg), padding='same', name='vvs_2', activation='relu')(vvs_1)
     for iterationX in range(vvs_layers - 2):
-        vvs_2 = Conv2D(vvs_width, (filter_size, filter_size), kernel_regularizer=keras.regularizers.l1(reg), padding='same', name='vvs_'+str(iterationX+3), activation='relu')(vvs_2)
+        vvs_2 = Conv2D(vvs_width, (filter_size, filter_size), kernel_regularizer=keras.regularizers.l1(
+            reg), padding='same', name='vvs_'+str(iterationX+3), activation='relu')(vvs_2)
     flattened = Flatten()(vvs_2)
 
 if vvs_layers == 2:
-    vvs_1 = Conv2D(vvs_width, (filter_size, filter_size), kernel_regularizer=keras.regularizers.l1(reg), padding='same', name='vvs_1', activation='relu', trainable=True)(retina_out)
+    vvs_1 = Conv2D(vvs_width, (filter_size, filter_size), kernel_regularizer=keras.regularizers.l1(
+        reg), padding='same', name='vvs_1', activation='relu', trainable=True)(retina_out)
 
-    vvs_2 = Conv2D(vvs_width, (filter_size, filter_size), kernel_regularizer=keras.regularizers.l1(reg), padding='same', name='vvs_2', activation='relu', trainable=True)(vvs_1)
-    
+    vvs_2 = Conv2D(vvs_width, (filter_size, filter_size), kernel_regularizer=keras.regularizers.l1(
+        reg), padding='same', name='vvs_2', activation='relu', trainable=True)(vvs_1)
+
     flattened = Flatten()(vvs_2)
 
 elif vvs_layers == 1:
-    vvs_1 = Conv2D(vvs_width, (filter_size, filter_size), kernel_regularizer=keras.regularizers.l1(reg), padding='same', name='vvs_1', activation='relu')(retina_out)
+    vvs_1 = Conv2D(vvs_width, (filter_size, filter_size), kernel_regularizer=keras.regularizers.l1(
+        reg), padding='same', name='vvs_1', activation='relu')(retina_out)
     flattened = Flatten()(vvs_1)
 
 elif vvs_layers == 0:
     flattened = Flatten()(retina_out)
 
 
-hidden = Dense(intermediate_dim, kernel_regularizer=keras.regularizers.l1(reg), name='dense1', activation='relu', trainable=True)(flattened)
+hidden = Dense(intermediate_dim, kernel_regularizer=keras.regularizers.l1(
+    reg), name='dense1', activation='relu', trainable=True)(flattened)
 
-output = Dense(num_classes, name='dense2', activation='softmax', trainable=True)(hidden)
-
+output = Dense(num_classes, name='dense2',
+               activation='softmax', trainable=True)(hidden)
 
 
 # initiate RMSprop optimizer
@@ -195,12 +232,12 @@ if task == 'classification':
 
     model.compile(loss='categorical_crossentropy',
                   optimizer=opt,
-                   metrics=['accuracy'])
+                  metrics=['accuracy'])
 
 else:
     sys.exit("No other task types besides classification configured yet")
 
-#model.load_weights(model_path, by_name=True) -- Uncomment to load from saved model
+# model.load_weights(model_path, by_name=True) -- Uncomment to load from saved model
 
 x_train = x_train.astype('float32')
 x_test = x_test.astype('float32')
@@ -212,10 +249,10 @@ model.summary()
 if not data_augmentation:
     print('Not using data augmentation.')
     if task == 'classification':
-        model.fit(x_train, y_train,
+        model.fit(x_train,
                   batch_size=batch_size,
                   epochs=epochs,
-                  validation_data=(x_test, y_test),
+                  validation_data=x_test,
                   shuffle=True)
 
 else:
@@ -232,18 +269,17 @@ else:
         horizontal_flip=True,
         vertical_flip=False)
 
-
     datagen.fit(x_train)
 
-
     if task == 'classification':
-        hist = model.fit_generator(datagen.flow(x_train, y_train,
-                                         batch_size=batch_size),
-                            steps_per_epoch=int(np.ceil(x_train.shape[0] / float(batch_size))),
-                            epochs=epochs,
-                            validation_data=(x_test, y_test),
-                            workers=4)
-        
+        hist = model.fit_generator(datagen.flow(x_train,
+                                                batch_size=batch_size),
+                                   steps_per_epoch=int(
+                                       np.ceil(x_train.shape[0] / float(batch_size))),
+                                   epochs=epochs,
+                                   validation_data=x_test,
+                                   workers=4)
+
 print('History', hist.history)
 
 # Save model and weights
@@ -256,5 +292,3 @@ np.save('Logs/'+model_name+'_VALACC.npy', hist.history['val_acc'])
 np.save('Logs/'+model_name+'_ACC.npy', hist.history['acc'])
 
 print('Saved trained model at %s ' % model_path)
-
-
