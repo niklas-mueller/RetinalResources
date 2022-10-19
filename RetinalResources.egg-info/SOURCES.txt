@@ -1,0 +1,6 @@
+README.md
+setup.py
+RetinalResources.egg-info/PKG-INFO
+RetinalResources.egg-info/SOURCES.txt
+RetinalResources.egg-info/dependency_links.txt
+RetinalResources.egg-info/top_level.txt
