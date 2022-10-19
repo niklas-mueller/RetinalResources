@@ -62,6 +62,7 @@ class RetinaCortexModel(Module):
                                                                 kernel_size=kernel_size, device='cuda:0', padding='same',
                                                                 )
                               )
+            retina.add_module(name=f'retina_relu_{i}', module=ReLU())
             n_in = retina_width
             n_out = retina_width if i < n_retina_layers-2 else n_retina_out_channels
 
@@ -80,6 +81,7 @@ class RetinaCortexModel(Module):
                                                               kernel_size=kernel_size, device='cuda:0', padding='same',
                                                               )
                                )
+            vvs_net.add_module(name=f'vvs_relu_{i}', module=ReLU())
             n_in = n_out
 
         # Put into learnable layers format
